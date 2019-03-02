@@ -47,8 +47,8 @@ code1 segment
     
 start1:
     ;inicjowanie stosu
-    mov sp, offset wstosu
-    mov ax, seg wstosu
+    mov sp, offset peak
+    mov ax, seg peak
     mov ss, ax
              
          
@@ -105,7 +105,7 @@ start1:
     xor ah, ah ; wyczysc ah    
     push ax ;odluz liczbe na stos   
     
-    add cx, ax
+    sub cx, ax
 
                              
                                  
@@ -261,7 +261,16 @@ start1:
                    
                    
     read_num endp 
-    
+               
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;TODO
+;    read_operator proc ;parsuje operator  zaczynajacy sie na adresie ds:dx i zwraca jego kod w al
+ ;        mov ax, offset zero  
+ ;        call checkword
+ ;        mov al, 0
+ ;   je endfunc_read_num               
+ ;   read_operator endp           
+               
     
     print_unum_word proc ; wypisuje na ekranie liczbe z ax
         push ax
@@ -478,11 +487,11 @@ ret
 
 code1 ends
 
-stos1 segment stack
+stos segment stack
     dw 200 dup(?)
-wstosu dw ?
+peak dw ?
 
-stos1 ends
+stos ends
 
 end start1
 
