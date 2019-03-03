@@ -40,7 +40,7 @@ seventy db 'siedemdizesiat $'
 eighty db 'osiemdziesiat $'
 ninety db 'dziewiecdziesiat $'
 hundred db 'sto $'
-buffer db 30,?, 30 dup(0),    ;bufor na podanego stringa
+buffer db 64,?, 64 dup(0),    ;bufor na podanego stringa
 result db 00h ; wynik
 db 100 dup(0)
 
@@ -117,10 +117,6 @@ start1:
     cmp cl, 03h
     je multiplying
 
-     mov dl, 'L' ;debugging
-    mov ah, 2
-    int 21h 
-
     calculate:
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAJ OPERATOR
   ;  xor ah, ah ; wyczysc ah    
@@ -140,10 +136,7 @@ start1:
     je wrong_input  
                              
                                  
-    mov dl, 'O' ;debugging
-    mov ah, 2
-    int 21h   
-    
+   
     
     jmp loop ;koniec petli glownej
     
@@ -317,7 +310,7 @@ start1:
     mov al, 0aah   ; 0aah oznacza nieprawidlowa wartosc
     
     endfunc_read_num:
-    cmp ch, 021h
+    cmp ch, 01h
     je neg_read_num
 
     pop cx
