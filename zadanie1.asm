@@ -8,7 +8,9 @@ emptytxt db ' $'
 hellotxt db "Wprowadz slowny opis dzialania:  $"        
 error_msg db 'Nieprawidlowe dane $'         
 print_error_msg db 'liczba spoza zakresu wypisywania $' 
+plus db 'plus $'
 minus db 'minus $'
+razy db 'razy $'
 zero db "zero $"
 one db "jeden $"
 two db "dwa $"
@@ -39,6 +41,7 @@ eighty db 'osiemdziesiat $'
 ninety db 'dziewiecdziesiat $'
 hundred db 'sto $'
 buffer db 30,?, 30 dup(0),    ;bufor na podanego stringa
+result db 00h ; wynik
 db 100 dup(0)
 
 dane1 ends
@@ -58,26 +61,15 @@ start1:
     mov ah, 9 ;wypisz stringa z from ds:dx
     int 21h  
         
+    mov dx, offset buffer
+    mov ah, 0ah           ;czytaj stringa
+    int 21h
     
- ;   mov bl, 0dh; w bl jest zapisany znak enter
-  ;  loop1:                           
-  ;  mov ah, 01h
-  ;  int 21h ;czytaj z echem jeden znak podany 
-  ;  push ax                              
-  ;  sub al, bl ; czy enter nacisniety
-  ;  jne loop1
+    xor bx, bx                      ; zeruj bx
+    mov bl, byte ptr buffer[1]      ; na 1 bajcie budora jest ile znakow sczytano
+    mov byte ptr buffer[bx+2], ' '
+    mov byte ptr buffer[bx+3], '$'  ; dodaj na koncu sczytanego stringa $
     
-        ;DO CZYTANIA STRINGOW JEST int 21h z ah = 0ah
-   
-   mov dx, offset buffer
-   mov ah, 0ah           ;czytaj stringa
-   int 21h
-   
-   xor bx, bx                      ; zeruj bx
-   mov bl, byte ptr buffer[1]      ; na 1 bajcie budora jest ile znakow sczytano
-   mov byte ptr buffer[bx+2], ' '
-   mov byte ptr buffer[bx+3], '$'  ; dodaj na koncu sczytanego stringa $
-   
     mov ah, 2
 	mov dl, 0ah ; wypisz \n
 	int 21h 
@@ -88,68 +80,129 @@ start1:
         
     mov bx, offset buffer + 2  ;opusc dwa pierwsze bajty buforu (dlugosc buforu i ilosc sczytanych bajtow
     
-    xor cx, cx
-    
-    loop:
+    xor cx, cx; wyzeruj cx - w cl bedzie kod dzialania
+    mov cl, 01h; ustaw na dodawanie (wpisanie pierwszej liczby to to samo co zero + liczba, a bufor wyniku na poczatku jest zapisany zerami)
+    ;;;;;;TABELKA KODOW
+    ; 01h add
+    ; 02h sub
+    ; 03h mul
+    ;
+
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   
+
+    loop: ;glowna petla wykonania programu
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAL LICZBE
+
     call delspace ;usun spacje z poczatku stringa
     
     mov al, byte ptr ds:[bx] ; sprawdz czy pierwszy znak stringa to nie dolar (czyli ze koniec)
     cmp al, '$'                                                             
-    je end
+    je wrong_input ;jesli tak to koncz
     
-    call read_num ;parsuj liczbe               
+    call read_num ;parsuj slowo na liczbe               
     
     cmp al, 0aah  ; obsluz bledne dane
     je wrong_input                    
-        
-    xor ah, ah ; wyczysc ah    
-    push ax ;odluz liczbe na stos   
-    
-    sub cx, ax
 
+
+
+    cmp cl, 01h
+    je adding
+
+    
+    cmp cl, 02h
+    je substracting
+
+    
+    cmp cl, 03h
+    je multiplying
+
+     mov dl, 'L' ;debugging
+    mov ah, 2
+    int 21h 
+
+    calculate:
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAJ OPERATOR
+  ;  xor ah, ah ; wyczysc ah    
+ ;   push ax ;odluz liczbe na stos (wprowadzona liczba jest w al)   
+     
+
+    ;add byte ptr result, al
+    call delspace ;usun spacje z poczatku stringa
+    
+    mov al, byte ptr ds:[bx] ; sprawdz czy pierwszy znak stringa to nie dolar (czyli ze koniec)
+    cmp al, '$'                                                             
+    je end ;jesli tak to koncz
+    
+    call read_operator ;parsuj slowo na liczbe               
+    
+    cmp cl, 0aah  ; obsluz bledne dane
+    je wrong_input  
                              
                                  
-    mov dl, 'Y' ;jak nie to sprawdz nastepny bajt 
+    mov dl, 'O' ;debugging
     mov ah, 2
     int 21h   
     
     
-    jmp loop
+    jmp loop ;koniec petli glownej
     
-   
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
     
     
     
     end:
-    mov ax, cx
+    mov ax, word ptr result ; przerzuc wynik do ax
     
-    call print_unum_word       
-                              
+    call print_unum_word   ; wypisz slownie liczbe z ax
+    
+    exit:                          
     mov	ah,4ch  ; zakoncz program i wroc do systemu   
 	int	021h    
 	
-	wrong_input:
+	wrong_input: ; jak blad to wystietl wiadomosc i koncz
 	mov dx, offset error_msg
 	mov ah, 9
 	int 21h
-	jmp end
+	jmp exit
 	
-	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    adding:
+    add byte ptr result, al
+    jmp calculate
+
+    substracting:
+    sub byte ptr result, al
+    jmp calculate
+    
+    multiplying:
+    push dx
+   ; xor dx, dx; wyzeruj dx - po jego zmianie bedziemy wiedziec czy byl overflw
+    mov cl, al; wyslij do cx liczbe przez ktora mnozymy
+    mov al, byte ptr result ; do ax zaladuj result
+    imul cl ; pomnoz  
+    mov byte ptr result, al; zapisz wynik
+    pop dx
+    jmp calculate
+    
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZESC KODU PROCEDUR;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   
 	
-	delspace proc ; utnij spacje z pocztaku stringa zaczynajacego sie na adresie ds:dx  
-;	mov bx, dx
+	delspace proc ; utnij spacje z pocztaku stringa zaczynajacego sie na adresie ds:bx  
     delspace_loop:
     mov al, ' '
     mov ah, byte ptr ds:[bx]
     sub al, ah ; sprawdz czy pierwszy znak to spacja
-    jne endfunc_delspace
+    jne endfunc_delspace ;jak nie to koncz
     
-    inc bx
-    jmp delspace_loop
+    inc bx ;jak tak to przesun na nastepny bit
+    jmp delspace_loop ;powtorz
     
     endfunc_delspace:
-   ; mov dx, bx
     ret 
     
     delspace endp
@@ -157,18 +210,17 @@ start1:
 	
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
-    checkword proc ; sprawdza, czy slowo zaczynajace sie na adresie ds:bx zgadza sie ze wzorcem pod adresem ds:ax 
-    push bx
-    ;mov bp, dx ;przepisz do cx poczatek stringa
+    checkword proc ; sprawdza, czy slowo zaczynajace sie na adresie ds:bx zgadza sie ze wzorcem pod adresem ds:ax (wynikiem jest odpowiednio ustwaiona flaga ZF)
+    push bx ; zachowaj na stos wskaznik na poczatek stringa (jak sie nie zgadza ze wzorcem to go przywaraca)
     mov bp, ax ; wpisz do bp adres wzorca
             
     checkloop:        
     mov al, byte ptr [bx]    ;pierwszy bajt stringa do porownania
-    mov ah, byte ptr ds:[bp]    ;pierwszy bajt wprowadzonego stringa
+    mov ah, byte ptr ds:[bp]    ;pierwszy bajt wzorca
 
     
     sub al, ah ;czy sa takie same
-    jne endfunc_checkword_wrong 
+    jne endfunc_checkword_wrong ;jak nie to koncz z bledem
     
     ok: ; jak ok to:
     mov al, 20h ;wprowadzam spacje
@@ -187,7 +239,7 @@ start1:
     ret                                       
     
     endfunc_checkword_good:
-    add sp, 2          ;sciagnij wartosc ze stosu  ! zmienia zero flag
+    add sp, 2          ;sciagnij wartosc ze stosu, bo juz jej nie potrzebujemy  ! zmienia zero flag
     cmp al, al ; ustaw zero flag
     ret
     
@@ -197,6 +249,14 @@ start1:
     
     read_num proc; procedura, ktora czyta slowo  zaczynajace sie na adresie ds:dx i zwraca jego wartosc w al
     
+    push cx
+
+    mov ch, 00h; ch oznacza
+    mov ax, offset minus  
+    call checkword
+    je negate_read_num
+
+    read_num_continue:
     mov ax, offset zero  
     call checkword
     mov al, 0
@@ -249,7 +309,7 @@ start1:
     mov al, 9
     je endfunc_read_num 
     
-     mov ax, offset ten  
+    mov ax, offset ten  
     call checkword
     mov al, 10
     je endfunc_read_num                      
@@ -257,94 +317,128 @@ start1:
     mov al, 0aah   ; 0aah oznacza nieprawidlowa wartosc
     
     endfunc_read_num:
+    cmp ch, 021h
+    je neg_read_num
+
+    pop cx
     ret             
-                   
+
+    neg_read_num:
+    neg al ;jak był minus wczesniej to al = -al
+
+    pop cx
+    ret
+
+    negate_read_num:
+    mov ch, 01h;zaznacz ze czytana liczba bedzie ujemna
+    call delspace 
+    jmp read_num_continue   ;czytaj nastepny wyraz             
                    
     read_num endp 
                
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;TODO
-;    read_operator proc ;parsuje operator  zaczynajacy sie na adresie ds:dx i zwraca jego kod w al
- ;        mov ax, offset zero  
- ;        call checkword
- ;        mov al, 0
- ;   je endfunc_read_num               
- ;   read_operator endp           
+   read_operator proc ;parsuje operator  zaczynajacy sie na adresie ds:dx i zwraca jego kod w cl
+        mov ax, offset plus  
+        call checkword
+        mov cl, 01h
+        je endfunc_read_operator
+
+        mov ax, offset minus  
+        call checkword
+        mov cl, 02h
+        je endfunc_read_operator
+
+        mov ax, offset razy  
+        call checkword
+        mov cl, 03h
+        je endfunc_read_operator
+
+        mov cl, 0aah ;bledny operator
+
+        endfunc_read_operator:
+        ret
+
+   read_operator endp           
                
-    
-    print_unum_word proc ; wypisuje na ekranie liczbe z ax
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  
+    print_unum_word proc ; wypisuje na ekranie slownie liczbe z ax (zakres od -100 do 100)
         push ax
         push bx
         push cx
-        push dx
+        push dx ; zachowaj wartosci rejestrow
         
-        cmp ax, 0
-        jnl print_abs 
+        cmp al, 0
+        jnl print_abs  ; jak ax >= 0 to nie zmieniaj znaku tylko wypisuj
         
-        neg ax    ;ax = -ax
+
+        ;w przeciwnym wypadku odwroc znak ax i wypisz na ekranie 'minus'
+        ;--------------------------------------------
+        neg al    ;ax = -ax
         push ax   ;push ax bo int21h wymaga zmiany ax
         mov dx, offset minus
-        mov ah, 9   ;wyswietl min
+        mov ah, 9   ;wyswietl minus
         int 21h
-        pop ax    ;przywroc stary
+        pop ax    ;przywroc stara wartosc rejestru
+        ;-------------------------------------
         
         
-        
-        print_abs:
-        cmp ax, 100 
-        je print_sto
-        jg print_error     
+        print_abs: ;wypisywanie liczby dodatniej
+        cmp al, 100 
+        je print_sto ;jak rowne sto to osobna funkcja
+        jg print_error  ; jak liczba > 100 to wyswietl ze nie jest w zakresie   
         
               
-        xor dx, dx      
+        xor dx, dx ; wyzeruj dx dla bezpieczenstwa     
               
         mov bx, 10
-        div bx ;dzielimy przez 10
+        div bx ;dzielimy przez 10 - wynik w ax, reszta w dx
         
         push dx ; przechowaj reszte z dzielenia
         
-        cmp ax, 0
-        je sing_digit_print
+        cmp al, 0
+        je sing_digit_print ;jak zero to przejdz do funkcji wypisywania jednosci
         
-        cmp ax, 1
-        je teen_print
+        cmp al, 1
+        je teen_print ;jak 1 to prezjdz do funkcji wypisujacej "-nastki"
         
-        cmp ax, 2
+        ; przechowac liczbe jednosci i wypisac 
+        cmp al, 2
         mov dx, offset twenty
         je double_dig_print
                            
         
-        cmp ax, 3
+        cmp al, 3
         mov dx, offset thirty
         je double_dig_print
         
         
-        cmp ax, 4
+        cmp al, 4
         mov dx, offset fourty
         je double_dig_print
         
         
-        cmp ax, 5
+        cmp al, 5
         mov dx, offset fifty
         je double_dig_print
         
         
-        cmp ax, 6
+        cmp al, 6
         mov dx, offset sixty
         je double_dig_print
         
         
-        cmp ax, 7
+        cmp al, 7
         mov dx, offset seventy
         je double_dig_print
         
         
-        cmp ax, 8
+        cmp al, 8
         mov dx, offset eighty
         je double_dig_print
         
         
-        cmp ax, 9
+        cmp al, 9
         mov dx, offset ninety
         je double_dig_print                   
           
@@ -363,43 +457,43 @@ start1:
         pop dx ; zrzuc reszte z dzielenia
         mov ax, dx; przesun ja do ax
         
-        cmp ax, 0
+        cmp al, 0
         mov dx, offset zero
         je digit_printout
 
-        cmp ax, 1
+        cmp al, 1
         mov dx, offset one
         je digit_printout
         
-        cmp ax, 2
+        cmp al, 2
         mov dx, offset two
         je digit_printout
         
-        cmp ax, 3
+        cmp al, 3
         mov dx, offset three
         je digit_printout
         
-        cmp ax, 4
+        cmp al, 4
         mov dx, offset four
         je digit_printout
         
-        cmp ax, 5
+        cmp al, 5
         mov dx, offset five
         je digit_printout
         
-        cmp ax, 6
+        cmp al, 6
         mov dx, offset six
         je digit_printout
         
-        cmp ax, 7
+        cmp al, 7
         mov dx, offset seven
         je digit_printout
         
-        cmp ax, 8
+        cmp al, 8
         mov dx, offset eight
         je digit_printout
         
-        cmp ax, 9
+        cmp al, 9
         mov dx, offset nine
         je digit_printout
         
@@ -415,43 +509,43 @@ start1:
 
         mov ax, dx; przesun ja do ax
         
-        cmp ax, 0
+        cmp al, 0
         mov dx, offset ten
         je digit_printout
 
-        cmp ax, 1
+        cmp al, 1
         mov dx, offset eleven
         je digit_printout
         
-        cmp ax, 2
+        cmp al, 2
         mov dx, offset twelve
         je digit_printout
         
-        cmp ax, 3
+        cmp al, 3
         mov dx, offset thirteen
         je digit_printout
         
-        cmp ax, 4
+        cmp al, 4
         mov dx, offset fourteen
         je digit_printout
         
-        cmp ax, 5
+        cmp al, 5
         mov dx, offset fifteen
         je digit_printout
         
-        cmp ax, 6
+        cmp al, 6
         mov dx, offset sixteen
         je digit_printout
         
-        cmp ax, 7
+        cmp al, 7
         mov dx, offset seventeen
         je digit_printout
         
-        cmp ax, 8
+        cmp al, 8
         mov dx, offset eighteen
         je digit_printout
         
-        cmp ax, 9
+        cmp al, 9
         mov dx, offset nineteen
         je digit_printout
 
@@ -460,7 +554,12 @@ start1:
         mov ah, 9 ; wypisz dziesiatki
     	int 21h
 
-        jmp sing_digit_print
+        pop dx ;zrzuc reszte z dzielenia i porownaj z zerem - zapobiega wypisaniu liczby np 40 jako 'czterdziesci zero'
+        cmp dx, 0
+        
+        je print_num_end; jak nie to skoncz
+        push dx
+        jmp sing_digit_print ;jak rozne od zera to wypisz jednosci
 
         print_sto:  ; osobny przypadek zeby nie musiec dzielic przez 100
 
