@@ -41,7 +41,7 @@ eighty db 'osiemdziesiat $'
 ninety db 'dziewiecdziesiat $'
 hundred db 'sto $'
 buffer db 64,?, 64 dup(0)   ;bufor na podanego stringa
-result db 00h ; wynik
+result dw 0000h ; wynik
 db 100 dup(0)
 
 dane1 ends
@@ -101,7 +101,7 @@ start1:
     
     call read_num ;parsuj slowo na liczbe               
     
-    cmp al, 0aah  ; obsluz bledne dane
+    cmp al, 080h  ; obsluz bledne dane
     je wrong_input                    
 
 
@@ -116,6 +116,14 @@ start1:
     
     cmp cl, 03h
     je multiplying
+
+    cmp word ptr ds:result, 128
+    jge eoverflow
+
+    cmp word ptr ds:result, -127
+    jl eoverflow
+    
+
 
     calculate:
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAJ OPERATOR
@@ -132,7 +140,7 @@ start1:
     
     call read_operator ;parsuj slowo na liczbe               
     
-    cmp cl, 0aah  ; obsluz bledne dane
+    cmp cl, 080h  ; obsluz bledne dane
     je wrong_input  
                              
                                  
@@ -158,6 +166,12 @@ start1:
 	mov ah, 9
 	int 21h
 	jmp exit
+
+    eoverflow:
+    mov dx, offset print_error_msg
+	mov ah, 9
+	int 21h
+	jmp exit
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -175,7 +189,7 @@ start1:
     mov cl, al; wyslij do cx liczbe przez ktora mnozymy
     mov al, byte ptr ds:result ; do ax zaladuj result
     imul cl ; pomnoz  
-    mov byte ptr ds:result, al; zapisz wynik
+    mov word ptr ds:result, ax; zapisz wynik
     pop dx
     jmp calculate
     
@@ -309,10 +323,10 @@ start1:
     mov al, 10
     je endfunc_read_num                      
                          
-    mov al, 0aah   ; 0aah oznacza nieprawidlowa wartosc
+    mov al, 080h   ; 080h oznacza nieprawidlowa wartosc
     
     endfunc_read_num:
-    cmp al, 0aah ;sprawdz czy blad
+    cmp al, 080h ;sprawdz czy blad
     je wrong_input
 
     cmp ch, 01h
@@ -352,7 +366,7 @@ start1:
         mov cl, 03h
         je endfunc_read_operator
 
-        mov cl, 0aah ;bledny operator
+        mov cl, 080h ;bledny operator
 
         endfunc_read_operator:
         ret
@@ -382,9 +396,9 @@ start1:
         
         
         print_abs: ;wypisywanie liczby dodatniej
-        cmp al, 100 
-        je print_sto ;jak rowne sto to osobna funkcja
-        jg print_error  ; jak liczba > 100 to wyswietl ze nie jest w zakresie   
+        cmp ax, 100 
+        jge print_sto ;jak rowne sto to osobna funkcja
+        ;jg print_error  ; jak liczba > 100 to wyswietl ze nie jest w zakresie   
         
               
         xor dx, dx ; wyzeruj dx dla bezpieczenstwa     
@@ -560,11 +574,16 @@ start1:
         jmp sing_digit_print ;jak rozne od zera to wypisz jednosci
 
         print_sto:  ; osobny przypadek zeby nie musiec dzielic przez 100
-
+        xor ah, ah
+        push ax
         mov dx, offset hundred
     	mov ah, 9          
     	int 21h
-	    jmp eend
+        pop ax
+        sub ax, 100
+        je print_num_end
+      ;  push ax
+	    jmp print_abs
         
         print_error:
            
