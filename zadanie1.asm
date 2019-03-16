@@ -5,7 +5,7 @@
 
 dane1 segment
 emptytxt db ' $'    
-hellotxt db "Wprowadz slowny opis dzialania:  $"        
+hellotxt db "Kalkulator NIE PRZESTRZEGA KOLEJNOSCI WYKONYWANIA DZIALAN \n Wprowadz slowny opis dzialania:  $"        
 error_msg db 'Nieprawidlowe dane $'         
 print_error_msg db 'liczba spoza zakresu wypisywania $' 
 plus db 'plus $'
@@ -248,8 +248,10 @@ start1:
     mov ax, offset minus  
     call checkword
     je negate_read_num
-
+    
     read_num_continue:
+    mov ch, 00h; ch oznacza
+    
     mov ax, offset zero  
     call checkword
     mov al, 0
