@@ -55,13 +55,6 @@ start:
     mov byte ptr [bx+81h], 0; zastepujemy CRET po sczytanym argumencie '$'
     
     lea dx, ds:[82h] 
-    
-   ; mov ah, 9
-   ; int 21h
-    
-    ; wait for any key....    
-    mov ah, 1
-    int 21h        
 
     mov al, 13h
 	mov ah, 0
@@ -72,14 +65,15 @@ start:
 	mov dx, 82h       ;otworz plik o nawzie poerwszego argumentu
 	mov ah, 3dh
 	int 21h  
+
+
 	
-	jc  endd  ;if error on opening file end program
+	jc  errendd  ;if error on opening file end program
     
+    mov dx, seg handle
+    mov ds, dx
          
     mov word ptr ds:handle ,ax ;file handle   
-                                       
-    
-
     
  
     mov bx, word ptr ds:handle; wpisz handle do pliku
@@ -91,16 +85,34 @@ start:
     int 21h
 
 
+    mov dx, seg handle
+    mov ds, dx
+    mov bx, word ptr ds:handle; wpisz handle do pliku
+    mov cx, 6500; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
+    mov dx, seg pixelArray
+    mov ds, dx
+    mov dx, offset pixelArray  
+    mov ah, 3fh ; czytaj z pliku
+    int 21h
+
+    
     mov dx, 0A000h ; wskaz na pamiec vga
 	mov es, dx
 
-    mov bx, word ptr ds:handle; wpisz handle do pliku
-    mov cx, 0FA00h; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
-    mov dx, 0A000h
+    mov cx, 0
+    lp:
+    mov dx, seg pixelArray
     mov ds, dx
-    mov dx, offset 0  
-    mov ah, 3fh ; czytaj z pliku
-    int 21h
+
+    mov bx, cx
+   ; mov al, byte ptr ds:[bx] 
+   mov al, 10
+    mov byte ptr es:[bx], al
+    inc cx
+    cmp cx, 0fa00h
+    jne lp
+
+
     
     ; mov dx, seg pixelArray
     ; mov ds, dx
@@ -128,21 +140,26 @@ start:
     int 21h ;zamknij plik
     
     endd:  
+ 
     mov ah, 1
     int 21h 
+
 
     mov ax, 4c00h ; exit to operating system.
     int 21h    
     errendd:
-	mov al, 1100b
-	mov cx, 10
-	mov dx, 20
-	mov ah, 0ch
-	int 10h     ; set pixel.
-    ;  lea dx, ds:[82h] 
     
-    ; mov ah, 9
-    int 21h
+    mov dx, 0A000h ; wskaz na pamiec vga
+	mov es, dx
+
+    mov bx, 500
+    llp:
+    mov byte ptr es:[bx], 13
+    dec bx
+    jne llp
+
+    
+
     jmp endd
 
 code ends
