@@ -40,7 +40,7 @@ seventy db 'siedemdizesiat $'
 eighty db 'osiemdziesiat $'
 ninety db 'dziewiecdziesiat $'
 hundred db 'sto $'
-buffer db 64,?, 64 dup(0)   ;bufor na podanego stringa
+buffer db 128,?, 128 dup(0)   ;bufor na podanego stringa
 result dw 0000h ; wynik
 db 100 dup(0)
 
@@ -188,7 +188,11 @@ start1:
    ; xor dx, dx; wyzeruj dx - po jego zmianie bedziemy wiedziec czy byl overflw
     mov cl, al; wyslij do cx liczbe przez ktora mnozymy
     mov al, byte ptr ds:result ; do ax zaladuj result
-    imul cl ; pomnoz  
+    imul cl ; pomnoz
+    cmp ax, 127  
+    je eoverflow
+    cmp ax, -127
+    jl eoverflow
     mov word ptr ds:result, ax; zapisz wynik
     pop dx
     jmp calculate

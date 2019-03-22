@@ -1,7 +1,6 @@
-; multi-segment executable file template.
 
 data segment
-    ; add your data here!
+
     pkey db "press any key...$"   
     handle dw ?
         
@@ -88,29 +87,21 @@ start:
     mov dx, seg handle
     mov ds, dx
     mov bx, word ptr ds:handle; wpisz handle do pliku
-    mov cx, 6500; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
+    mov cx, 320*200; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
     mov dx, seg pixelArray
     mov ds, dx
     mov dx, offset pixelArray  
     mov ah, 3fh ; czytaj z pliku
     int 21h
 
+    call loadPalette
+
+    mov cx, 320*200
+    l1:
     
-    mov dx, 0A000h ; wskaz na pamiec vga
-	mov es, dx
-
-    mov cx, 0
-    lp:
-    mov dx, seg pixelArray
-    mov ds, dx
-
-    mov bx, cx
-   ; mov al, byte ptr ds:[bx] 
-   mov al, 10
-    mov byte ptr es:[bx], al
-    inc cx
-    cmp cx, 0fa00h
-    jne lp
+        call setPixel
+        
+    loop l1
 
 
     
@@ -134,18 +125,28 @@ start:
     ; wait for any key....    
    ; mov ah, 1
     ;int 21h   
-    
+
+    mov dx, seg handle
+    mov ds, dx
+
+
     mov bx, word ptr ds:handle; wpisz handle do pliku
     mov ah, 3eh
     int 21h ;zamknij plik
     
     endd:  
  
+
+
     mov ah, 1
     int 21h 
 
+    mov ah, 0
+    mov al, 03h
+    int 10h
 
-    mov ax, 4c00h ; exit to operating system.
+
+    mov ax, 4c00h ; zakoncz program
     int 21h    
     errendd:
     
@@ -157,11 +158,57 @@ start:
     mov byte ptr es:[bx], 13
     dec bx
     jne llp
-
-    
-
     jmp endd
+
+
+    setPixel: ; wyswietl piksel pod koordynatami cx = 320*y+x (tablica pikseli pod ds:[bx])   
+        
+        mov dx, 0A000h ; wskaz na pamiec vga
+        mov es, dx
+
+        mov dx, seg pixelArray
+        mov ds, dx
+
+        xor dx, dx
+        mov ax, cx
+        mov bx, 320
+        div bx ; w ax y w dx x
+
+        push dx
+        neg ax
+        add ax, 200
+        mov dx, 320
+        mul dx
+        pop dx
+        add ax, dx
+        mov bx, ax
+
+        mov al, byte ptr ds:[bx] 
+       ; mov al, 10
+        mov bx, cx
+        mov byte ptr es:[bx], al
+        
+        ret
+    
+    loadPalette:
+        mov dx, 3C8h
+        mov ax, 0
+        out dx, ax
+        mov cx, 256*4
+        loadloop:
+        
+        mov dx, seg palette
+        mov ds, dx
+        mov di, 256*4
+        sub di, cx
+        ;mov ax, 0ffffh
+        mov ax, word ptr ds:[palette +di]
+        mov dx, 3C9h
+        out dx, ax
+        loop loadloop
+
+        ret
 
 code ends
 
-end start ; set entry point and stop the assembler.
+end start
