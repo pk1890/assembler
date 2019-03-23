@@ -2,6 +2,9 @@
 data segment
 
     pkey db "press any key...$"   
+    currx dw 0000h 
+    curry dw 0010h
+    
     handle dw ?
         
     ;BITMAPFILEHEADER ma 14 bajtow
@@ -28,7 +31,7 @@ data ends
 
 image segment
       
-    pixelArray db   64000 dup (0) ; tablica pikseli
+    pixelArray db   0ffffh dup (0) ; tablica pikseli
 image ends
 
 stack segment stack
@@ -90,48 +93,89 @@ start:
     mov ah, 42h
     int 21h
 
+    MAINLOOP:
 
+    mov cx, 200
+    drawRowLoop:
+        call drawRow
+    loop drawRowLoop
 
-    mov dx, seg handle
-    mov ds, dx
-    mov bx, word ptr ds:handle; wpisz handle do pliku
-    mov cx, 320*200; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
-    mov dx, seg pixelArray
-    mov ds, dx
-    mov dx, offset pixelArray  
-    mov ah, 3fh ; czytaj z pliku
-    int 21h
     call loadPalette
 
-    mov cx, 320*200
-    l1:
+   
+
+    ;  mov dx, seg curry
+    ;     mov ds, dx 
+    ;     mov dx, word ptr ds:curry
+    ;     add dx, 1
+    ;     mov word ptr ds:curry, dx
+   
+    mov ah, 00h
+    int 16h
+    ; cmp al, 'a'
+   
+    cmp ah, 050h ;male a strzalka w dol
+    je GoDown
+    cmp ah, 048h ;male a strzalka w dol
+    je GoUp
+    cmp ah, 04Bh ;male a strzalka w dol
+    je GoLeft
+    cmp ah, 04Dh ;male a strzalka w dol
+    je GoRight
     
-        call setPixel
+    cmp ah, 01h
+    je endd
+    
+    
+    jmp MAINLOOP
+
+    GoDown:
+        mov dx, seg curry
+        mov ds, dx 
+        mov dx, word ptr ds:curry
+        add dx, 2
+        mov word ptr ds:curry, dx
+    jmp MAINLOOP
+   GoUp:
+        mov dx, word ptr ds:curry
+        sub dx, 2
+        mov word ptr ds:curry, dx
+    jmp MAINLOOP
+
+   GoLeft:
+        mov dx, word ptr ds:currx
+        sub dx, 2
+        mov word ptr ds:currx, dx
+    jmp MAINLOOP
         
-    loop l1
+   GoRight:
+        mov dx, word ptr ds:currx
+        add dx, 2
+        mov word ptr ds:currx, dx
+    jmp MAINLOOP
+        
 
 
-    
+    ; mov dx, seg handle
+    ; mov ds, dx
+    ; mov bx, word ptr ds:handle; wpisz handle do pliku
+    ; mov cx, 320*200; wybierz 320x200 bajtow i zapisz je do odpowiedniego bufora
     ; mov dx, seg pixelArray
     ; mov ds, dx
-    ; mov dx, offset pixelArray      
+    ; mov dx, offset pixelArray  
+    ; mov ah, 3fh ; czytaj z pliku
+    ; int 21h
+    ; call loadPalette
 
-    ; mov bx, seg palette
-    ; mov di, offset palette
-
-    ; mov ax, 0
-    ; pixelLoop:
+    ; mov cx, 320*200
+    ; l1:
     
-    ; mov dword ptr, 
+    ;     call setPixel
+        
+    ; loop l1
 
 
-    ; inc ax
-    ; cmp ax, 0‭FA00‬h
-    ; jl pixelLoop
-
-    ; wait for any key....    
-   ; mov ah, 1
-    ;int 21h   
+    
 
     mov dx, seg handle
     mov ds, dx
@@ -145,8 +189,8 @@ start:
  
 
 
-    mov ah, 1
-    int 21h 
+ ;   mov ah, 1
+  ;  int 21h 
 
     mov ah, 0
     mov al, 03h
@@ -167,8 +211,129 @@ start:
     jne llp
     jmp endd
 
+    drawRow: ; wystietl 1 linie obrazka (nr linii w cx)
+        push cx
+        mov dx, seg currx
+        mov ds, dx
 
-    setPixel: ; wyswietl piksel pod koordynatami cx = 320*y+x (tablica pikseli pod ds:[bx])   
+
+
+        push cx
+        xor cx, cx
+        mov dx, word ptr ds:bfOffBits
+        mov bx, word ptr ds:handle
+        mov al, 0 ;SEEK FROM BEGIN
+        mov ah, 42h
+        int 21h
+        
+        pop cx
+        mov ax, cx
+        push cx
+
+        mov cx, word ptr ds:biHeight
+        sub cx, ax
+        mov ax, word ptr ds:curry
+        sub cx, ax ; cx = height - cx - curry
+
+        mov ax, cx
+        mov cx, word ptr ds:biWidth
+
+        ;;poprawka na wielkosc rzedu
+        push ax
+        push bx
+        push dx
+        
+        mov ax, cx
+        mov bx, 8 ;;liczba bitow na piksel
+        mul bx 
+        
+        add ax, 31
+        jnc notoveradd
+        add dx, 1
+        notoveradd:
+        mov bx, 32
+        div bx
+
+        mov bx, 4
+        mul bx
+        mov cx, ax
+
+        pop dx
+        pop bx
+        pop ax
+
+
+
+        mul cx ; wynik w dx:ax
+        mov cx, dx
+        mov dx, ax ; przeniesienie do cx:dx
+
+        mov bx, word ptr ds:handle
+        mov al, 1 ;SEEK FROM CURRENT
+        mov ah, 42h
+        int 21h ; przejdz na poczatek szukanej linii
+
+        mov dx, seg handle
+        mov ds, dx
+        mov bx, word ptr ds:handle; wpisz handle do pliku
+
+        mov cx, word ptr ds:biWidth
+        mov dx, seg pixelArray
+        mov ds, dx
+        mov dx, offset pixelArray  
+        mov ah, 3fh ; czytaj z pliku linie
+        int 21h
+
+        mov dx, seg currx
+        mov ds, dx
+        
+        pop ax ; nr linii ktora chcemy wyswietlic
+        mov bx, 320
+        mul bx
+        mov cx, word ptr ds:biWidth
+        LineLoop:
+        call setPixelLine
+        loop LineLoop
+        
+        pop cx
+        ret
+
+    setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = 320*y, w cx x)
+        push ax
+        push cx
+        add ax, cx
+        mov cx, ax
+        mov dx, 0A000h ; wskaz na pamiec vga
+        mov es, dx
+
+        mov dx, seg pixelArray ;wskaz na
+        mov ds, dx
+
+        xor dx, dx
+        mov ax, cx
+        mov bx, 320
+        div bx ; w ax y w dx x
+        
+        mov bx, dx
+        mov dx, seg currx ;wskaz na
+        mov ds, dx
+        mov dx, word ptr ds:currx
+        add bx, dx
+        
+        mov dx, seg pixelArray ;wskaz na
+        mov ds, dx
+
+        mov al, byte ptr ds:[bx] 
+       ; mov al, 10
+        mov bx, cx
+        mov byte ptr es:[bx], al
+        
+        pop cx
+        pop ax
+        ret
+
+
+    setPixel: ; wyswietl piksel pod koordynatami cx = 320*y+x (tablica pikseli pod ds:[bx]) w lewym gornym rogu zaczynamy od piksela o offsecie currx, curry   
         
         mov dx, 0A000h ; wskaz na pamiec vga
         mov es, dx
