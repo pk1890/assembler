@@ -3,8 +3,8 @@ data segment
 
     pkey db "press any key...$"   
     currx dw 0000h 
-    curry dw 0010h
-    
+    curry dw 0000h
+    effectflags db 00000000b
     handle dw ?
         
     ;BITMAPFILEHEADER ma 14 bajtow
@@ -122,6 +122,12 @@ start:
     je GoLeft
     cmp ah, 04Dh ;male a strzalka w dol
     je GoRight
+    cmp al, '1'
+    je switchRed
+    cmp al, '2'
+    je switchGreen
+    cmp al, '3'
+    je switchBlue
     
     cmp ah, 01h
     je endd
@@ -154,6 +160,17 @@ start:
         mov word ptr ds:currx, dx
     jmp MAINLOOP
         
+    switchRed:
+        xor byte ptr ds:effectflags[0], 00000001b
+    jmp MAINLOOP
+
+    switchGreen:
+        xor byte ptr ds:effectflags[0], 00000010b
+    jmp MAINLOOP
+
+    switchBlue:
+        xor byte ptr ds:effectflags[0], 00000100b
+    jmp MAINLOOP
 
 
     ; mov dx, seg handle
@@ -380,23 +397,45 @@ start:
         push cx
         mov cl, 02h
         
+        
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;RED
         mov al, byte ptr ds:[di+2]
+        mov ch, byte ptr ds:effectflags[0]
+        and ch, 00000001b
+        je skipredeff
+        mov al, 00h
+        
+        skipredeff:
         shr al, cl
         mov dx, 3C9h
         out dx, al
-        
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;GREEN;;;;;;;;;;;;;;;;;;;
         mov al, byte ptr ds:[di+1]
+        mov ch, byte ptr ds:effectflags[0]
         shr al, cl
         
+        and ch, 00000010b
+        je skipgreeneff
+        mov al, 00h
+        skipgreeneff:
+
         mov dx, 3C9h
         out dx, al
         
+        ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;BLUE;;;;;;;;;;;;;;;;;;;
         mov al, byte ptr ds:[di]
+        mov ch, byte ptr ds:effectflags[0]
         shr al, cl
         
+        and ch, 00000100b
+        je skipblueeff
+        mov al, 00h
+        skipblueeff:
+
         mov dx, 3C9h
         out dx, al
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         pop cx
         add di, 4
         loop loadloop
