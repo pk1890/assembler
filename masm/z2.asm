@@ -83,6 +83,14 @@ start:
     mov ah, 3fh ; czytaj z pliku
     int 21h
 
+    xor cx, cx
+    mov dx, word ptr ds:bfOffBits
+    mov bx, word ptr ds:handle
+    mov al, 0 ;SEEK FROM BEGIN
+    mov ah, 42h
+    int 21h
+
+
 
     mov dx, seg handle
     mov ds, dx
@@ -93,7 +101,6 @@ start:
     mov dx, offset pixelArray  
     mov ah, 3fh ; czytaj z pliku
     int 21h
-
     call loadPalette
 
     mov cx, 320*200
@@ -192,19 +199,41 @@ start:
     
     loadPalette:
         mov dx, 3C8h
-        mov ax, 0
-        out dx, ax
-        mov cx, 256*4
-        loadloop:
+        mov al, 0
+        out dx, al
         
         mov dx, seg palette
         mov ds, dx
-        mov di, 256*4
-        sub di, cx
+        mov cx, 256
+        mov di, offset ds:palette
+        loadloop:
+        ; mov di, 256*4
+        ; sub di, cx
+        ; mov dx, offset palette
+        ; add di, dx
         ;mov ax, 0ffffh
-        mov ax, word ptr ds:[palette +di]
+        push cx
+        mov cl, 02h
+        
+        mov al, byte ptr ds:[di+2]
+        shr al, cl
         mov dx, 3C9h
-        out dx, ax
+        out dx, al
+        
+        mov al, byte ptr ds:[di+1]
+        shr al, cl
+        
+        mov dx, 3C9h
+        out dx, al
+        
+        mov al, byte ptr ds:[di]
+        shr al, cl
+        
+        mov dx, 3C9h
+        out dx, al
+
+        pop cx
+        add di, 4
         loop loadloop
 
         ret
