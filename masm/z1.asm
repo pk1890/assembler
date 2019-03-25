@@ -1,7 +1,4 @@
 
-; You may customize this and other start-up templates; 
-; The location of this template is c:\emu8086\inc\0_com_template.txt
-
 
 dane1 segment
 emptytxt db ' $'    
@@ -91,19 +88,18 @@ start1:
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   
 
     looop: ;glowna petla wykonania programu
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAL LICZBE
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAJ LICZBE
 
     call delspace ;usun spacje z poczatku stringa
     
     mov al, byte ptr ds:[bx] ; sprawdz czy pierwszy znak stringa to nie dolar (czyli ze koniec)
     cmp al, '$'                                                             
-    je wrong_input ;jesli tak to koncz
+    je wrong_input ;jesli tak to koncz z bledem (tzn ze podano operator a potem nie bylo liczby)
     
     call read_num ;parsuj slowo na liczbe               
     
     cmp al, 080h  ; obsluz bledne dane
     je wrong_input                    
-
 
 
     cmp cl, 01h
@@ -117,15 +113,15 @@ start1:
     cmp cl, 03h
     je multiplying
 
-    cmp word ptr ds:result, 128
+
+
+    calculate:
+    cmp word ptr ds:result, 128 ;obsluga overflow
     jge eoverflow
 
     cmp word ptr ds:result, -127
     jl eoverflow
     
-
-
-    calculate:
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZYTAJ OPERATOR
   ;  xor ah, ah ; wyczysc ah    
  ;   push ax ;odluz liczbe na stos (wprowadzona liczba jest w al)   
@@ -176,11 +172,11 @@ start1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
     adding:
-    add byte ptr ds:result, al
+    add word ptr ds:result, ax
     jmp calculate
 
     substracting:
-    sub byte ptr ds:result, al
+    sub word ptr ds:result, ax
     jmp calculate
     
     multiplying:
@@ -203,25 +199,31 @@ start1:
 
 	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CZESC KODU PROCEDUR;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;   
 	
-	delspace proc ; utnij spacje z pocztaku stringa zaczynajacego sie na adresie ds:bx  
+	delspace:; utnij spacje z pocztaku stringa zaczynajacego sie na adresie ds:bx  
     delspace_loop:
-    mov al, ' '
-    mov ah, byte ptr ds:[bx]
-    sub al, ah ; sprawdz czy pierwszy znak to spacja
-    jne endfunc_delspace ;jak nie to koncz
     
+    mov ah, byte ptr ds:[bx]
+    mov al, 9
+    cmp al, ah ; sprawdz czy pierwszy znak to tabulacja
+    je loop_delspace ;jak tak to nastepna iteracja
+    
+    mov ah, byte ptr ds:[bx]
+    mov al, 20h
+    cmp al, ah ; sprawdz czy pierwszy znak to spacja
+    je loop_delspace ;jak tak to nastepna iteracja 
+    ret 
+
+    loop_delspace:
     inc bx ;jak tak to przesun na nastepny bit
     jmp delspace_loop ;powtorz
     
-    endfunc_delspace:
-    ret 
     
-    delspace endp
+    ;delspace endp
 	
 	
 	 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
-    checkword proc ; sprawdza, czy slowo zaczynajace sie na adresie ds:bx zgadza sie ze wzorcem pod adresem ds:ax (wynikiem jest odpowiednio ustwaiona flaga ZF)
+    checkword: ; sprawdza, czy slowo zaczynajace sie na adresie ds:bx zgadza sie ze wzorcem pod adresem ds:ax (wynikiem jest odpowiednio ustwaiona flaga ZF)
     push bx ; zachowaj na stos wskaznik na poczatek stringa (jak sie nie zgadza ze wzorcem to go przywaraca)
     mov bp, ax ; wpisz do bp adres wzorca
             
@@ -230,21 +232,28 @@ start1:
     mov ah, byte ptr ds:[bp]    ;pierwszy bajt wzorca
 
     
+    cmp ah, 20h ;sprawdzam, czy ten znak to byla spacja
+    je check_if_end
+
+    je endfunc_checkword_good ;jak to byla spacja, to znaczy ze wprowadzone slowo zgadza sie ze wzornikiem
+        
     sub al, ah ;czy sa takie same
     jne endfunc_checkword_wrong ;jak nie to koncz z bledem
     
     ok: ; jak ok to:
-    mov al, 20h ;wprowadzam spacje
-    sub al, ah ;sprawdzam, czy ten znak to byla spacja
-    
-    je endfunc_checkword_good ;jak to byla spacja, to znaczy ze wprowadzone slowo zgadza sie ze wzornikiem
-        
         
     inc bx  ;nastepny bajt
     inc bp  ;nastepny bajt
     jmp checkloop ;powtorz
     
-                         
+    check_if_end:
+    cmp al, 20h
+    je endfunc_checkword_good
+    cmp al, 9
+    je endfunc_checkword_good
+
+    jmp endfunc_checkword_wrong
+
     endfunc_checkword_wrong:
     pop bx ; przywroc wskaznik na przed slowem 
     ret                                       
@@ -254,11 +263,11 @@ start1:
     cmp al, al ; ustaw zero flag
     ret
     
-    checkword endp
+    ;checkword endp
     
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     
-    read_num proc; procedura, ktora czyta slowo  zaczynajace sie na adresie ds:dx i zwraca jego wartosc w al
+    read_num proc; procedura, ktora czyta slowo  zaczynajace sie na adresie ds:dx i zwraca jego wartosc w ax
     
     push cx
 
@@ -272,65 +281,65 @@ start1:
     
     mov ax, offset zero  
     call checkword
-    mov al, 0
+    mov ax, 0
     je endfunc_read_num
     
     mov ax, offset one  
     call checkword
-    mov al, 1
+    mov ax, 1
     je endfunc_read_num
     
     mov ax, offset two  
     call checkword
-    mov al, 2
+    mov ax, 2
     je endfunc_read_num     
     
     mov ax, offset three  
     call checkword
-    mov al, 3
+    mov ax, 3
     je endfunc_read_num
     
     mov ax, offset four  
     call checkword
-    mov al, 4
+    mov ax, 4
     je endfunc_read_num
     
     mov ax, offset five  
     call checkword
-    mov al, 5
+    mov ax, 5
     je endfunc_read_num
     
     mov ax, offset six  
     call checkword
-    mov al, 6
+    mov ax, 6
     je endfunc_read_num
     
     mov ax, offset seven  
     call checkword
-    mov al, 7
+    mov ax, 7
     je endfunc_read_num
     
     mov ax, offset eight  
     call checkword
-    mov al, 8
+    mov ax, 8
     je endfunc_read_num
                          
     mov ax, seg nine
     mov ds, ax                     
     mov ax, offset nine   
     call checkword
-    mov al, 9
+    mov ax, 9
     je endfunc_read_num 
     
     mov ax, offset ten  
     call checkword
-    mov al, 10
+    mov ax, 10
     je endfunc_read_num                      
                          
-    mov al, 080h   ; 080h oznacza nieprawidlowa wartosc
+    mov ax, 080h   ; 080h oznacza nieprawidlowa wartosc
     
     endfunc_read_num:
-    cmp al, 080h ;sprawdz czy blad
+    cmp ax, 080h ;sprawdz czy blad
     je wrong_input
 
     cmp ch, 01h
@@ -340,7 +349,7 @@ start1:
     ret             
 
     neg_read_num:
-    neg al ;jak był minus wczesniej to al = -al
+    neg ax ;jak był minus wczesniej to al = -al
 
     pop cx
     ret
@@ -384,13 +393,13 @@ start1:
         push cx
         push dx ; zachowaj wartosci rejestrow
         
-        cmp al, 0
+        cmp ax, 0
         jnl print_abs  ; jak ax >= 0 to nie zmieniaj znaku tylko wypisuj
         
 
         ;w przeciwnym wypadku odwroc znak ax i wypisz na ekranie 'minus'
         ;--------------------------------------------
-        neg al    ;ax = -ax
+        neg ax    ;ax = -ax
         push ax   ;push ax bo int21h wymaga zmiany ax
         mov dx, offset minus
         mov ah, 9   ;wyswietl minus
