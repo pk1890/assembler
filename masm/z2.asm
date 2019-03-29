@@ -4,6 +4,7 @@ data segment
     pkey db "press any key...$"   
     currx dw 0000h 
     curry dw 0000h
+    zoom db 00h
     effectflags db 00000000b
     handle dw ?
         
@@ -56,7 +57,6 @@ start:
     
     mov byte ptr [bx+81h], 0; zastepujemy CRET po sczytanym argumencie '$'
     
-    lea dx, ds:[82h] 
 
     mov al, 13h
 	mov ah, 0
@@ -68,8 +68,6 @@ start:
 	mov ah, 3dh
 	int 21h  
 
-
-	
 	jc  errendd  ;if error on opening file end program
     
     mov dx, seg handle
@@ -86,18 +84,12 @@ start:
     mov ah, 3fh ; czytaj z pliku
     int 21h
 
-    xor cx, cx
-    mov dx, word ptr ds:bfOffBits
-    mov bx, word ptr ds:handle
-    mov al, 0 ;SEEK FROM BEGIN
-    mov ah, 42h
-    int 21h
-
     MAINLOOP:
 
     mov cx, 200
     drawRowLoop:
         call drawRow
+        ; call drawRow
     loop drawRowLoop
 
     call loadPalette
@@ -229,8 +221,10 @@ start:
     jmp endd
 
     drawRow: ; wystietl 1 linie obrazka (nr linii w cx)
-        push cx
-        mov dx, seg currx
+        push cx ;zeby zachowac ten z petli
+        dec cx
+
+        mov dx, seg currx 
         mov ds, dx
 
 
@@ -241,10 +235,10 @@ start:
         mov bx, word ptr ds:handle
         mov al, 0 ;SEEK FROM BEGIN
         mov ah, 42h
-        int 21h
+        int 21h ;przesun za naglowek
         
         pop cx
-        mov ax, cx
+        mov ax, cx ; w ax siedzi numer linii do wczytania
         push cx
 
         mov cx, word ptr ds:biHeight
@@ -307,17 +301,55 @@ start:
         pop ax ; nr linii ktora chcemy wyswietlic
         mov bx, 320
         mul bx
-        mov cx, word ptr ds:biWidth
+        mov cx, 320
         LineLoop:
         call setPixelLine
         loop LineLoop
-        
+
+
         pop cx
         ret
 
+    ; setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = y, w cx x)
+    ;     push ax
+    ;     push cx
+
+    ;     dec cx ; poprawka na to ze w petli cx jesrt od 320 do 1 a potzreba od 319 do 0
+    ;     mov bx, 320
+    ;     mul ax
+    ;     add ax, cx
+
+    ;     mov dx, 0A000h ; wskaz na pamiec vga
+    ;     mov es, dx
+
+    ;     mov dx, seg pixelArray ;wskaz na
+    ;     mov ds, dx
+
+    ;     mov dx, seg currx 
+    ;     mov ds, dx
+    ;     mov dx, word ptr ds:currx
+    ;     add cx, dx ; cx = currx + x
+
+    ;     mov dx, seg pixelArray
+    ;     mov ds, dx
+
+    ;     mov di, cx ; di = currx + x
+
+    ;     mov cl, byte ptr ds:[di]
+    ;     mov di, ax ;przekaz do rejestru adresowego offset w pamieci obrazu
+    ;     mov byte ptr es:[di], cl
+
+
+
+    ;     pop cx 
+    ;     pop ax
+    ;     ret
     setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = 320*y, w cx x)
         push ax
         push cx
+
+        dec cx ; poprawka na to ze w petli cx jesrt od 320 do 1 a potzreba od 319 do 0
+
         add ax, cx
         mov cx, ax
         mov dx, 0A000h ; wskaz na pamiec vga
@@ -380,6 +412,11 @@ start:
         ret
     
     loadPalette:
+        push ax
+        push bx
+        push cx 
+        push dx
+        
         mov dx, 3C8h
         mov al, 0
         out dx, al
@@ -440,6 +477,10 @@ start:
         add di, 4
         loop loadloop
 
+        pop  dx
+        pop  cx 
+        pop  bx
+        pop  ax
         ret
 
 code ends
