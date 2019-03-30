@@ -4,7 +4,7 @@ data segment
     pkey db "press any key...$"   
     currx dw 0000h 
     curry dw 0000h
-    zoom db 00h
+    zoom dw 0001h
     effectflags db 00000000b
     handle dw ?
         
@@ -87,11 +87,35 @@ start:
     MAINLOOP:
 
     mov cx, 200
+    mov di, cx
+    push dx
     drawRowLoop:
-        call drawRow
-        ; call drawRow
-    loop drawRowLoop
+        call loadRow
+        push cx
+        mov cx, di
+        mov dx, seg zoom
+        mov ds, dx
+        mov dx, word ptr ds:zoom 
 
+
+        zoomLoop:
+        call drawRow
+        dec di
+        dec cx
+        dec dx
+        cmp dx, 0
+        jg zoomLoop
+
+        ; call drawRow
+        ; dec di
+
+        pop cx
+        dec cx
+        cmp di, 0
+        jg drawRowLoop
+
+    ;  loop drawRowLoop
+pop dx
     call loadPalette
 
    
@@ -114,6 +138,10 @@ start:
     je GoLeft
     cmp ah, 04Dh ;male a strzalka w dol
     je GoRight
+    cmp ah, 04Eh ;male a strzalka w dol
+    je zoomUp 
+    cmp ah, 04Ah ;male a strzalka w dol
+    je zoomDown
     cmp al, '1'
     je switchRed
     cmp al, '2'
@@ -125,6 +153,31 @@ start:
     je endd
     
     
+    jmp MAINLOOP
+
+
+    zoomUp:
+    mov dx, seg zoom
+    mov ds, dx
+    mov dx, word ptr ds:zoom
+    cmp dx, 64
+    je MAINLOOP
+    shl dx, 1
+    mov word ptr ds:zoom, dx
+
+
+    jmp MAINLOOP
+
+    zoomDown:
+    mov dx, seg zoom
+    mov ds, dx
+    mov dx, word ptr ds:zoom
+    cmp dx, 1
+    je MAINLOOP
+    shr dx, 1
+    mov word ptr ds:zoom, dx
+
+
     jmp MAINLOOP
 
     GoDown:
@@ -220,10 +273,9 @@ start:
     jne llp
     jmp endd
 
-    drawRow: ; wystietl 1 linie obrazka (nr linii w cx)
+    loadRow: ; wystietl 1 linie obrazka (nr linii w cx)
         push cx ;zeby zachowac ten z petli
         dec cx
-
         mov dx, seg currx 
         mov ds, dx
 
@@ -295,19 +347,74 @@ start:
         mov ah, 3fh ; czytaj z pliku linie
         int 21h
 
+        pop ax
+        pop cx 
+        ret
+
+        drawRow:
+        push ax
+        push bx
+        push cx 
+        push dx
+
+
+
         mov dx, seg currx
         mov ds, dx
         
-        pop ax ; nr linii ktora chcemy wyswietlic
+        ; pop ax ; nr linii ktora chcemy wyswietlic
+        mov ax, cx
         mov bx, 320
         mul bx
         mov cx, 320
+        mov dx, cx
+        push di
+        ;mov di, 8
         LineLoop:
+        mov di, seg zoom
+        mov ds, di
+        mov di, word ptr ds:zoom
+        pixZoomLoop:
         call setPixelLine
+        dec dx
+        dec di
+        cmp di, 0
+        jg pixZoomLoop
+        
         loop LineLoop
+        pop di
+;;;;;;;;;;;;;;;;;
 
+    ; drawRowLoop
+    ;     call loadRow
+    ;     push cx
+    ;     mov cx, di
+    ;     mov dx, seg zoom
+    ;     mov ds, dx
+    ;     mov dx, word ptr ds:zoom 
 
+    ;     zoomLoop:
+    ;     call drawRow
+    ;     dec di
+    ;     dec cx
+    ;     dec dx
+    ;     cmp dx, 0
+    ;     jg zoomLoop
+
+    ;     ; call drawRow
+    ;     ; dec di
+
+    ;     pop cx
+    ;     dec cx
+    ;     cmp di, 0
+    ;     jg drawRowLoop
+;;;;;;;;;;;;;;;;
+
+        pop dx
         pop cx
+        pop bx
+        pop ax
+
         ret
 
     ; setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = y, w cx x)
@@ -344,8 +451,12 @@ start:
     ;     pop cx 
     ;     pop ax
     ;     ret
-    setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = 320*y, w cx x)
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    setPixelLine: ; wersja z wyswietlaniem piksela na aktualnej linii (w ax = 320*y, w cx x) x w pamieci obrazu w dx
         push ax
+        push dx
         push cx
 
         dec cx ; poprawka na to ze w petli cx jesrt od 320 do 1 a potzreba od 319 do 0
@@ -375,9 +486,15 @@ start:
         mov al, byte ptr ds:[bx] 
        ; mov al, 10
         mov bx, cx
+        pop cx
+        sub bx, cx
+        pop dx
+        add bx, dx
+       sub bx, 320
+
         mov byte ptr es:[bx], al
         
-        pop cx
+        ;  pop cx
         pop ax
         ret
 
