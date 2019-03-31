@@ -320,7 +320,37 @@ pop dx
         mov ax, word ptr ds:curry
         sub cx, ax ; cx = height - cx - curry
 
+        cmp cx, 0
+        jl nullLine
+        
+        cmp cx, word ptr ds:biHeight
+        jge nullLine
 
+        jmp contRead 
+
+        nullLine:
+        push di
+        mov di, 0
+        mov al, 00h;
+        blackLoop:
+
+        mov dx, seg pixelArray
+        mov ds, dx
+        ; neg al
+        mov byte ptr ds:pixelArray[di], al 
+
+        inc di
+        mov dx, seg biWidth
+        mov ds, dx
+        cmp di, word ptr ds:biWidth
+        jl blackLoop
+
+        pop di
+        pop ax
+        pop cx 
+        ret
+
+        contRead:
         mov ax, cx
         mov cx, word ptr ds:biWidth
 
@@ -379,7 +409,7 @@ pop dx
 
         preparePixel:        
 
-        mov cx, 3 ; sczytaj 3 bajty 
+        mov cx, 3 ; zczytaj 3 bajty 
         mov dx, seg red24Val
         mov ds, dx
         mov dx, offset red24Val  
@@ -427,6 +457,12 @@ pop dx
         mov ds, dx
         cmp di, word ptr ds:biWidth
         jl preparePixel
+
+        mov dx, seg red24Val
+        mov ds, dx
+        mov byte ptr ds:red24Val, 00h 
+        mov byte ptr ds:green24Val, 00h 
+        mov byte ptr ds:blue24Val, 00h 
 
         pop di
         pop ax
